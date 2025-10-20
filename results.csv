@@ -1,0 +1,7 @@
+"name","email","department","validation_status","validation_score","is_syntax_valid","is_disposable","is_role_account","mx_records","smtp_check"
+"John Doe","john.doe@example.com","Engineering","invalid",10,true,false,false,"","failed"
+"Jane Smith","jane.smith@company.com","Marketing","invalid",0,true,false,false,"","not_performed"
+"Invalid User","invalid-email","HR","invalid",0,false,false,false,"","not_performed"
+"Bob Johnson","bob.johnson@test.org","Sales","invalid",10,true,false,false,"mailcow.test.org","failed"
+"Disposable User","user@mailinator.com","Finance","invalid",0,true,true,false,"","not_performed"
+"Role Account","support@business.com","Support","invalid",10,true,false,true,"business-com.mail.protection.outlook.com","failed"

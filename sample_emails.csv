@@ -1,0 +1,7 @@
+name,email,department
+John Doe,john.doe@example.com,Engineering
+Jane Smith,jane.smith@company.com,Marketing
+Invalid User,invalid-email,HR
+Bob Johnson,bob.johnson@test.org,Sales
+Disposable User,user@mailinator.com,Finance
+Role Account,support@business.com,Support
