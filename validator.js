@@ -37,21 +37,83 @@ async function smtpProbe(mxHost, from, to) {
   const client = new SMTPClient({
     host: mxHost,
     port: 25,
-    timeout: 5000
+    timeout: 10000, // Increase timeout to 10 seconds
+    secure: false // Explicitly set secure option
   });
   
   try {
-    await client.connect();
-    await client.greet({ hostname: 'validator.local' });
-    await client.mail({ from });
-    const rcptRes = await client.rcpt({ to });
-    await client.quit();
+    // Add connection timeout handling
+    await Promise.race([
+      client.connect(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SMTP connection timeout')), 10000)
+      )
+    ]);
+    
+    await Promise.race([
+      client.greet({ hostname: 'validator.local' }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SMTP greeting timeout')), 5000)
+      )
+    ]);
+    
+    await Promise.race([
+      client.mail({ from }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SMTP MAIL timeout')), 5000)
+      )
+    ]);
+    
+    const rcptRes = await Promise.race([
+      client.rcpt({ to }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SMTP RCPT timeout')), 5000)
+      )
+    ]);
+    
+    await Promise.race([
+      client.quit(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SMTP quit timeout')), 5000)
+      )
+    ]);
+    
     return { ok: true, response: rcptRes.message || '' };
   } catch (e) {
+    // Ensure client is properly closed even if errors occur
     try { 
-      await client.quit(); 
-    } catch(_) {}
-    return { ok: false, error: e.message };
+      await Promise.race([
+        client.quit(),
+        new Promise((resolve) => setTimeout(resolve, 1000))
+      ]);
+    } catch(_) {
+      // Ignore errors during quit as connection may already be closed
+    }
+    
+    // Handle specific network errors
+    if (e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED' || e.code === 'ETIMEDOUT') {
+      return { 
+        ok: false, 
+        error: `Connection error: ${e.message}`,
+        code: e.code
+      };
+    }
+    
+    // Handle timeout errors
+    if (e.message && e.message.includes('timeout')) {
+      return { 
+        ok: false, 
+        error: e.message,
+        code: 'TIMEOUT'
+      };
+    }
+    
+    // Handle general errors
+    return { 
+      ok: false, 
+      error: e.message,
+      code: e.code || 'UNKNOWN_ERROR'
+    };
   }
 }
 

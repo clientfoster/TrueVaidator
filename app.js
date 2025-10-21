@@ -7,6 +7,18 @@ const csv = require('csv-parser');
 const fs = require('fs');
 const { Parser } = require('json2csv');
 
+// Add global error handlers to prevent application crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Application specific logging, throwing an error, or other logic here
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Application specific logging, throwing an error, or other logic here
+  // Note: Process should ideally be restarted after this
+});
+
 const app = express();
 // Increase the request size limit to handle large bulk email requests
 app.use(express.json({ limit: '50mb' }));
@@ -64,6 +76,8 @@ app.post('/v1/validate/bulk', async (req, res) => {
     total: emails.length,
     completed: 0,
     results: [],
+    rowData: emails.map(email => ({ email })), // Store email data for CSV output
+    emailColumn: 'email', // Store email column name
     createdAt: new Date(),
     finishedAt: null
   };
@@ -206,20 +220,39 @@ app.get('/v1/jobs/:jobId/results/csv', (req, res) => {
   }
   
   try {
-    // Combine original row data with validation results
-    const csvData = job.rowData.map((row, index) => {
-      const result = job.results[index] || {};
-      return {
-        ...row,
-        validation_status: result.status || 'unknown',
-        validation_score: result.score || 0,
-        is_syntax_valid: result.syntax || false,
-        is_disposable: result.disposable || false,
-        is_role_account: result.role || false,
-        mx_records: result.mx ? result.mx.join(';') : '',
-        smtp_check: result.smtp ? (result.smtp.ok ? 'passed' : 'failed') : 'not_performed'
-      };
-    });
+    let csvData;
+    
+    // Check if this is a CSV job (has rowData) or regular bulk job
+    if (job.rowData && job.rowData.length > 0) {
+      // CSV job - combine original row data with validation results
+      csvData = job.rowData.map((row, index) => {
+        const result = job.results[index] || {};
+        return {
+          ...row,
+          validation_status: result.status || 'unknown',
+          validation_score: result.score || 0,
+          is_syntax_valid: result.syntax || false,
+          is_disposable: result.disposable || false,
+          is_role_account: result.role || false,
+          mx_records: result.mx ? result.mx.join(';') : '',
+          smtp_check: result.smtp ? (result.smtp.ok ? 'passed' : 'failed') : 'not_performed'
+        };
+      });
+    } else {
+      // Regular bulk job - create CSV data from results only
+      csvData = job.results.map(result => {
+        return {
+          email: result.email,
+          validation_status: result.status || 'unknown',
+          validation_score: result.score || 0,
+          is_syntax_valid: result.syntax || false,
+          is_disposable: result.disposable || false,
+          is_role_account: result.role || false,
+          mx_records: result.mx ? result.mx.join(';') : '',
+          smtp_check: result.smtp ? (result.smtp.ok ? 'passed' : 'failed') : 'not_performed'
+        };
+      });
+    }
     
     // Create CSV
     const json2csvParser = new Parser();
@@ -230,6 +263,7 @@ app.get('/v1/jobs/:jobId/results/csv', (req, res) => {
     res.attachment(`validation_results_${jobId}.csv`);
     res.send(csvOutput);
   } catch (error) {
+    console.error('Error generating CSV:', error);
     res.status(500).json({ error: 'Failed to generate CSV output' });
   }
 });
@@ -237,16 +271,23 @@ app.get('/v1/jobs/:jobId/results/csv', (req, res) => {
 // Process bulk job (simulated async processing)
 async function processBulkJob(jobId, emails, options) {
   const job = jobs.get(jobId);
+  if (!job) {
+    console.error(`Instance ${instanceId}: Job ${jobId} not found`);
+    return;
+  }
+  
   job.status = 'running';
   
   console.log(`Instance ${instanceId}: Starting processing of job ${jobId}`);
   
   // Process each email
-  for (const email of emails) {
+  for (let i = 0; i < emails.length; i++) {
+    const email = emails[i];
     try {
       const result = await validateEmail(email, options);
       job.results.push(result);
     } catch (error) {
+      console.error(`Instance ${instanceId}: Error validating email ${email}:`, error);
       job.results.push({
         email,
         error: error.message
@@ -281,6 +322,7 @@ async function processBulkJobWithCSV(jobId, emails, rowData, emailColumn, option
       const result = await validateEmail(email, options);
       job.results.push(result);
     } catch (error) {
+      console.error(`Instance ${instanceId}: Error validating email ${email}:`, error);
       job.results.push({
         email,
         error: error.message

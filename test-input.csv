@@ -1,0 +1,4 @@
+email,name,company
+john@example.com,John Doe,Example Inc
+jane@test.com,Jane Smith,Test Corp
+invalid-email,Invalid Person,No Company
