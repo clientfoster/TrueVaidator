@@ -1,0 +1,18 @@
+{
+  "emails": [
+    "test@nonexistentdomainthatdoesnotexist12345.com",
+    "user@invalidserverthatwillresetconnection.com",
+    "bad@serverwithnetworkissues.com",
+    "test@gmail.com",
+    "user@yahoo.com",
+    "example@outlook.com",
+    "invalid-email",
+    "not-an-email@",
+    "@missing-domain.com",
+    "temp@10minutemail.com",
+    "test@mailinator.com"
+  ],
+  "options": {
+    "skip_smtp": false
+  }
+}

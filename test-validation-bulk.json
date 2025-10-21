@@ -1,0 +1,8 @@
+{
+  "emails": [
+    "test@gmail.com",
+    "invalid-email",
+    "user@yahoo.com",
+    "bad@10minutemail.com"
+  ]
+}

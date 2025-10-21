@@ -107,7 +107,8 @@ label {
 
 input[type="email"],
 input[type="text"],
-textarea {
+textarea,
+select {
     width: 100%;
     padding: 12px 15px;
     border: 2px solid #e0e0e0;
@@ -118,7 +119,8 @@ textarea {
 
 input[type="email"]:focus,
 input[type="text"]:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
     outline: none;
     border-color: #667eea;
 }
@@ -346,6 +348,18 @@ footer {
         margin-bottom: 10px;
         margin-right: 0;
     }
+}
+
+/* Hidden utility class */
+.hidden {
+    display: none;
+}
+
+/* Warning message */
+.warning {
+    color: #f44336;
+    font-size: 0.9rem;
+    margin-top: 5px;
 }
 
 /* Loading spinner */

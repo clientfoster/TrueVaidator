@@ -1,0 +1,15 @@
+{
+  "emails": [
+    "test@gmail.com",
+    "user@yahoo.com",
+    "invalid-email",
+    "not-an-email@",
+    "temp@10minutemail.com",
+    "nonexistent@nonexistentdomain12345.com",
+    "bad@serverwithnetworkissues.com",
+    "test@invalidserverthatwillreset.com"
+  ],
+  "options": {
+    "skip_smtp": false
+  }
+}

@@ -30,7 +30,13 @@ Accessible at: `http://localhost:3000/`
 - Automatic job creation and tracking
 - Progress monitoring through job ID
 
-#### 3. Job Tracking
+#### 3. CSV Upload Validation
+- Upload CSV files containing email addresses
+- Dynamic column selection for identifying email column
+- Automatic header detection and dropdown selection
+- Option to skip SMTP verification for faster results
+
+#### 4. Job Tracking
 - Check status of bulk validation jobs
 - Retrieve results for completed jobs
 - Progress visualization
@@ -38,13 +44,17 @@ Accessible at: `http://localhost:3000/`
 ### User Interface Components
 
 #### Tabs
-The interface is organized into three main tabs:
+The interface is organized into four main tabs:
 - **Single Email**: For validating individual email addresses
 - **Bulk Validation**: For validating multiple email addresses
+- **CSV Upload**: For validating emails from CSV files
 - **Job Tracking**: For monitoring validation jobs
 
 #### Form Elements
 - Input fields for email addresses and job IDs
+- File upload for CSV files
+- Dropdown selection for email column (dynamic)
+- Text input as fallback for email column
 - Checkboxes for validation options
 - Action buttons for triggering validation processes
 
@@ -81,6 +91,8 @@ Accessible at: `http://localhost:3000/admin`
 - `GET /` - Serve public user interface
 - `POST /v1/validate` - Single email validation
 - `POST /v1/validate/bulk` - Bulk email validation
+- `POST /v1/validate/bulk/csv` - CSV upload validation
+- `POST /v1/csv/headers` - CSV header parsing
 - `GET /v1/jobs/{jobId}` - Job status
 - `GET /v1/jobs/{jobId}/results` - Job results
 
@@ -126,6 +138,16 @@ Accessible at: `http://localhost:3000/admin`
 5. Note the Job ID from the results
 6. Use the Job ID in the "Job Tracking" tab to monitor progress
 
+### CSV Upload Validation
+1. Navigate to the "CSV Upload" tab
+2. Select a CSV file using the file picker
+3. Once the file is selected, the system will automatically parse the headers
+4. Select the appropriate column that contains email addresses from the dropdown
+5. Optionally check "Skip SMTP verification" for faster results
+6. Click "Validate CSV"
+7. Note the Job ID from the results
+8. Use the Job ID in the "Job Tracking" tab to monitor progress
+
 ### Job Tracking
 1. Navigate to the "Job Tracking" tab
 2. Enter a Job ID
@@ -169,6 +191,7 @@ Accessible at: `http://localhost:3000/admin`
 The web interface has been tested with:
 - Various email validation scenarios
 - Bulk job processing workflows
+- CSV upload with dynamic header selection
 - Responsive design across different screen sizes
 - Cross-browser compatibility
 - Error handling and edge cases
@@ -182,3 +205,5 @@ Potential improvements for future versions:
 - Real-time notifications for job completion
 - Dark mode support
 - Internationalization support
+- Enhanced CSV preview functionality
+- Column mapping for multiple data fields

@@ -68,7 +68,11 @@
                     </div>
                     <div class="form-group">
                         <label for="email-column">Email Column Name</label>
-                        <input type="text" id="email-column" placeholder="Enter column name containing emails (default: email)" value="email">
+                        <select id="email-column" class="hidden">
+                            <option value="">Select email column</option>
+                        </select>
+                        <input type="text" id="email-column-input" placeholder="Enter column name containing emails (default: email)" value="email">
+                        <div id="column-warning" class="warning hidden">Please select the column that contains email addresses</div>
                     </div>
                     <div class="form-group">
                         <label>

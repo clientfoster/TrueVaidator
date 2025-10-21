@@ -7,6 +7,13 @@ const validateCsvBtn = document.getElementById('validate-csv');
 const checkJobBtn = document.getElementById('check-job');
 const getResultsBtn = document.getElementById('get-results');
 const getCsvResultsBtn = document.getElementById('get-csv-results');
+const csvFileInput = document.getElementById('csv-file');
+const emailColumnSelect = document.getElementById('email-column');
+const emailColumnInput = document.getElementById('email-column-input');
+const columnWarning = document.getElementById('column-warning');
+
+// Add event listener for CSV file input change
+csvFileInput.addEventListener('change', handleCsvFileChange);
 
 // Tab Switching
 tabButtons.forEach(button => {
@@ -26,6 +33,61 @@ tabButtons.forEach(button => {
         });
     });
 });
+
+// Handle CSV file change to parse headers
+async function handleCsvFileChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Only process if we're on the CSV tab
+    const activeTab = document.querySelector('.tab-pane.active');
+    if (!activeTab || activeTab.id !== 'csv-tab') return;
+    
+    try {
+        const formData = new FormData();
+        formData.append('csvFile', file);
+        
+        const response = await fetch('/v1/csv/headers', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to parse CSV headers');
+        }
+        
+        const result = await response.json();
+        
+        if (result.headers && result.headers.length > 0) {
+            // Clear previous options
+            emailColumnSelect.innerHTML = '<option value="">Select email column</option>';
+            
+            // Add headers as options
+            result.headers.forEach(header => {
+                const option = document.createElement('option');
+                option.value = header;
+                option.textContent = header;
+                emailColumnSelect.appendChild(option);
+            });
+            
+            // Show select and hide input
+            emailColumnSelect.classList.remove('hidden');
+            emailColumnInput.classList.add('hidden');
+            emailColumnInput.value = '';
+        } else {
+            // Fallback to text input if no headers found
+            emailColumnSelect.classList.add('hidden');
+            emailColumnInput.classList.remove('hidden');
+            emailColumnInput.value = 'email';
+        }
+    } catch (error) {
+        console.error('Error parsing CSV headers:', error);
+        // Fallback to text input on error
+        emailColumnSelect.classList.add('hidden');
+        emailColumnInput.classList.remove('hidden');
+        emailColumnInput.value = 'email';
+    }
+}
 
 // Single Email Validation
 validateSingleBtn.addEventListener('click', async () => {
@@ -111,12 +173,23 @@ validateBulkBtn.addEventListener('click', async () => {
 // CSV Upload Validation
 validateCsvBtn.addEventListener('click', async () => {
     const csvFile = document.getElementById('csv-file').files[0];
-    const emailColumn = document.getElementById('email-column').value.trim() || 'email';
+    // Get email column from either select or input
+    const emailColumn = emailColumnSelect.classList.contains('hidden') 
+        ? emailColumnInput.value.trim() || 'email'
+        : emailColumnSelect.value || 'email';
     const skipSmtp = document.getElementById('csv-skip-smtp').checked;
     
     if (!csvFile) {
         alert('Please select a CSV file');
         return;
+    }
+    
+    // Validate email column selection
+    if (!emailColumn) {
+        columnWarning.classList.remove('hidden');
+        return;
+    } else {
+        columnWarning.classList.add('hidden');
     }
     
     // Show loading state
