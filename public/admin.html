@@ -155,135 +155,86 @@
         const refreshBtn = document.getElementById('refresh-dashboard');
         const jobsTableBody = document.getElementById('jobs-table-body');
         
-        // Sample in-memory jobs data (in a real app, this would come from the server)
-        let jobs = new Map();
-        
-        // Update stats
-        function updateStats() {
-            document.getElementById('total-jobs').textContent = jobs.size;
-            
-            let activeJobs = 0;
-            let completedJobs = 0;
-            let failedJobs = 0;
-            
-            jobs.forEach(job => {
-                switch(job.status) {
-                    case 'running':
-                        activeJobs++;
-                        break;
-                    case 'completed':
-                        completedJobs++;
-                        break;
-                    case 'failed':
-                        failedJobs++;
-                        break;
+        // Update stats from API
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch stats');
                 }
-            });
-            
-            document.getElementById('active-jobs').textContent = activeJobs;
-            document.getElementById('completed-jobs').textContent = completedJobs;
-            document.getElementById('failed-jobs').textContent = failedJobs;
+                const stats = await response.json();
+                
+                document.getElementById('total-jobs').textContent = stats.totalJobs;
+                document.getElementById('active-jobs').textContent = stats.activeJobs;
+                document.getElementById('completed-jobs').textContent = stats.completedJobs;
+                document.getElementById('failed-jobs').textContent = stats.failedJobs;
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
         }
         
-        // Update jobs table
-        function updateJobsTable() {
-            if (jobs.size === 0) {
-                jobsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No jobs found</td></tr>';
-                return;
-            }
-            
-            let jobsHtml = '';
-            // Convert map to array and sort by creation date (newest first)
-            const jobsArray = Array.from(jobs.values()).sort((a, b) => 
-                new Date(b.createdAt) - new Date(a.createdAt)
-            );
-            
-            jobsArray.forEach(job => {
-                const progress = job.total > 0 ? Math.round((job.completed / job.total) * 100) : 0;
-                const createdDate = new Date(job.createdAt).toLocaleString();
-                const finishedDate = job.finishedAt ? new Date(job.finishedAt).toLocaleString() : '-';
+        // Update jobs table from API
+        async function updateJobsTable() {
+            try {
+                const response = await fetch('/api/jobs');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch jobs');
+                }
+                const jobs = await response.json();
                 
-                jobsHtml += `
-                    <tr>
-                        <td><a href="#" class="job-id-link" data-job-id="${job.id}">${job.id.substring(0, 8)}...</a></td>
-                        <td><span class="status-badge ${job.status}">${job.status}</span></td>
-                        <td>${job.total}</td>
-                        <td>${job.completed}</td>
-                        <td>
-                            <div style="display: flex; align-items: center;">
-                                <div style="width: 100px; height: 8px; background-color: #e0e0e0; border-radius: 4px; margin-right: 10px;">
-                                    <div style="width: ${progress}%; height: 100%; background-color: #667eea; border-radius: 4px;"></div>
+                if (jobs.length === 0) {
+                    jobsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No jobs found</td></tr>';
+                    return;
+                }
+                
+                let jobsHtml = '';
+                
+                jobs.forEach(job => {
+                    const progress = job.total > 0 ? Math.round((job.completed / job.total) * 100) : 0;
+                    const createdDate = new Date(job.createdAt).toLocaleString();
+                    const finishedDate = job.finishedAt ? new Date(job.finishedAt).toLocaleString() : '-';
+                    
+                    jobsHtml += `
+                        <tr>
+                            <td><a href="#" class="job-id-link" data-job-id="${job.id}">${job.id.substring(0, 8)}...</a></td>
+                            <td><span class="status-badge ${job.status}">${job.status}</span></td>
+                            <td>${job.total || 0}</td>
+                            <td>${job.completed || 0}</td>
+                            <td>
+                                <div style="display: flex; align-items: center;">
+                                    <div style="width: 100px; height: 8px; background-color: #e0e0e0; border-radius: 4px; margin-right: 10px;">
+                                        <div style="width: ${progress}%; height: 100%; background-color: #667eea; border-radius: 4px;"></div>
+                                    </div>
+                                    <span>${progress}%</span>
                                 </div>
-                                <span>${progress}%</span>
-                            </div>
-                        </td>
-                        <td>${createdDate}</td>
-                        <td>${finishedDate}</td>
-                    </tr>
-                `;
-            });
-            
-            jobsTableBody.innerHTML = jobsHtml;
-            
-            // Add click handlers for job ID links
-            document.querySelectorAll('.job-id-link').forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const jobId = e.target.getAttribute('data-job-id');
-                    alert(`Job details for ID: ${jobId}\n(In a full implementation, this would show job details)`);
+                            </td>
+                            <td>${createdDate}</td>
+                            <td>${finishedDate}</td>
+                        </tr>
+                    `;
                 });
-            });
+                
+                jobsTableBody.innerHTML = jobsHtml;
+                
+                // Add click handlers for job ID links
+                document.querySelectorAll('.job-id-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const jobId = e.target.getAttribute('data-job-id');
+                        // In a real implementation, this could redirect to a job details page
+                        alert(`Job ID: ${jobId}\nIn a full implementation, this would show job details.`);
+                    });
+                });
+            } catch (error) {
+                console.error('Error fetching jobs:', error);
+                jobsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Error loading jobs</td></tr>';
+            }
         }
         
         // Refresh dashboard data
-        function refreshDashboard() {
-            // In a real implementation, this would fetch data from the server
-            // For demo purposes, we'll simulate some data
-            
-            // Add some sample jobs if none exist
-            if (jobs.size === 0) {
-                // Generate sample jobs
-                for (let i = 0; i < 5; i++) {
-                    const jobId = 'job-' + Math.random().toString(36).substr(2, 9);
-                    const statuses = ['queued', 'running', 'completed', 'failed'];
-                    const status = statuses[Math.floor(Math.random() * statuses.length)];
-                    const total = Math.floor(Math.random() * 1000) + 100;
-                    const completed = status === 'completed' ? total : 
-                                    status === 'failed' ? 0 : 
-                                    Math.floor(Math.random() * total);
-                    
-                    jobs.set(jobId, {
-                        id: jobId,
-                        status: status,
-                        total: total,
-                        completed: completed,
-                        createdAt: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)),
-                        finishedAt: status === 'completed' || status === 'failed' ? 
-                                   new Date(Date.now() - Math.floor(Math.random() * 24 * 60 * 60 * 1000)) : 
-                                   null
-                    });
-                }
-            }
-            
-            // Randomly update some job statuses for demo
-            if (Math.random() > 0.7) {
-                const jobIds = Array.from(jobs.keys());
-                if (jobIds.length > 0) {
-                    const randomJobId = jobIds[Math.floor(Math.random() * jobIds.length)];
-                    const job = jobs.get(randomJobId);
-                    if (job.status === 'running') {
-                        job.status = Math.random() > 0.5 ? 'completed' : 'failed';
-                        job.finishedAt = new Date();
-                        job.completed = job.status === 'completed' ? job.total : job.completed;
-                    } else if (job.status === 'queued') {
-                        job.status = 'running';
-                    }
-                    jobs.set(randomJobId, job);
-                }
-            }
-            
-            updateStats();
-            updateJobsTable();
+        async function refreshDashboard() {
+            await updateStats();
+            await updateJobsTable();
         }
         
         // Event Listeners
