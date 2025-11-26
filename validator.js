@@ -1,6 +1,5 @@
 const dns = require('dns').promises;
 const { SMTPClient } = require('smtp-client');
-const YahooOAuth = require('./yahoo-oauth');
 const SMTPOAuthClient = require('./smtp-oauth-client');
 
 // Wrap the SMTP client to catch low-level errors
@@ -14,7 +13,6 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const disposableCache = new Map();
 
 // Initialize Yahoo OAuth client
-const yahooOAuth = new YahooOAuth();
 
 /**
  * Perform basic syntax check on email address
@@ -95,7 +93,7 @@ function isYahooDomain(domain) {
  * @param {string} to - Recipient email address
  * @returns {Promise<Object>} - Result of SMTP probe
  */
-async function smtpProbeOAuth(mxHost, from, to) {
+/*async function smtpProbeOAuth(mxHost, from, to) {
   let client;
   
   try {
@@ -184,7 +182,7 @@ async function smtpProbeOAuth(mxHost, from, to) {
       code: e.code || 'SMTP_OAUTH_ERROR'
     };
   }
-}
+}*/
 
 /**
  * Probe SMTP server to check if it accepts a recipient
@@ -595,7 +593,7 @@ async function validateEmail(email, opts = {}) {
     const autoSkipSMTP = shouldSkipSMTP(domain);
     
     // Try OAuth authentication for Yahoo domains if configured
-    if (isYahoo && yahooOAuth.isConfigured() && !opts.skip_smtp) {
+    /*if (isYahoo && yahooOAuth.isConfigured() && !opts.skip_smtp) {
       try {
         const oauthProbeResult = await smtpProbeOAuth(mx[0], 'validator@example.com', email);
         result.smtp = oauthProbeResult;
@@ -620,7 +618,7 @@ async function validateEmail(email, opts = {}) {
       } catch (oauthError) {
         console.error('OAuth SMTP probe error:', oauthError);
       }
-    }
+    }*/
     
     // Skip SMTP if requested or auto-detected as strict domain
     if (opts.skip_smtp || autoSkipSMTP) {
@@ -714,8 +712,8 @@ module.exports = {
   syntaxCheck,
   getMx,
   smtpProbe,
-  smtpProbeOAuth,
+  // smtpProbeOAuth,
   validateEmail: safeValidateEmail, // Export the safe wrapper
-  yahooOAuth, // Export Yahoo OAuth instance for token management
-  isYahooDomain
+  // yahooOAuth, // Export Yahoo OAuth instance for token management
+  // isYahooDomain
 };
