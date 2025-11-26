@@ -1,14 +1,11 @@
 const express = require('express');
-const { validateEmail, yahooOAuth } = require('./validator');
+const { validateEmail } = require('./validator');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { Parser } = require('json2csv');
-
-// Load environment variables
-require('dotenv').config();
 
 // Add ultra-comprehensive global error handlers to prevent application crashes
 process.on('unhandledRejection', (reason, promise) => {
@@ -632,115 +629,6 @@ app.get('/', (req, res) => {
 // Serve the admin dashboard
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-
-// OAuth endpoints for Yahoo authentication
-app.get('/oauth/authorize', (req, res) => {
-  const { email } = req.query;
-  
-  if (!email) {
-    return res.status(400).json({ error: 'Email parameter required' });
-  }
-  
-  if (!yahooOAuth.isConfigured()) {
-    return res.status(503).json({ 
-      error: 'Yahoo OAuth is not configured. Please set YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET environment variables.' 
-    });
-  }
-  
-  // Generate state parameter with email
-  const state = Buffer.from(JSON.stringify({ email, timestamp: Date.now() })).toString('base64');
-  const authUrl = yahooOAuth.getAuthorizationUrl(state);
-  
-  // Log for debugging
-  console.log('OAuth Authorization Request:');
-  console.log('- Email:', email);
-  console.log('- Client ID:', process.env.YAHOO_CLIENT_ID);
-  console.log('- Redirect URI:', process.env.YAHOO_REDIRECT_URI);
-  console.log('- Auth URL:', authUrl);
-  
-  res.json({ authUrl, state });
-});
-
-app.get('/oauth/callback', async (req, res) => {
-  const { code, state } = req.query;
-  
-  if (!code || !state) {
-    return res.status(400).send('Missing OAuth parameters');
-  }
-  
-  try {
-    // Decode state to get email
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString('utf-8'));
-    const { email } = stateData;
-    
-    // Exchange code for token
-    const tokenData = await yahooOAuth.getAccessToken(code);
-    
-    // Store token for the email
-    yahooOAuth.storeToken(email, tokenData);
-    
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>OAuth Success</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
-          .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
-          .info { color: #666; margin-bottom: 10px; }
-        </style>
-      </head>
-      <body>
-        <div class="success">✓ Authentication Successful</div>
-        <div class="info">Yahoo OAuth token has been stored for ${email}</div>
-        <div class="info">You can now validate Yahoo emails using SMTP OAuth.</div>
-        <div style="margin-top: 30px;">
-          <a href="/">Return to Validator</a>
-        </div>
-      </body>
-      </html>
-    `);
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    res.status(500).send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>OAuth Error</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
-          .error { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
-          .info { color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="error">✗ Authentication Failed</div>
-        <div class="info">${error.message}</div>
-        <div style="margin-top: 30px;">
-          <a href="/">Return to Validator</a>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-});
-
-// Check OAuth status for an email
-app.get('/oauth/status', async (req, res) => {
-  const { email } = req.query;
-  
-  if (!email) {
-    return res.status(400).json({ error: 'Email parameter required' });
-  }
-  
-  const hasToken = await yahooOAuth.getValidToken(email) !== null;
-  
-  res.json({ 
-    email,
-    hasToken,
-    configured: yahooOAuth.isConfigured()
-  });
 });
 
 const PORT = process.env.PORT || 3000;

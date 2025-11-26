@@ -1,7 +1,5 @@
 const dns = require('dns').promises;
 const { SMTPClient } = require('smtp-client');
-const YahooOAuth = require('./yahoo-oauth');
-const SMTPOAuthClient = require('./smtp-oauth-client');
 
 // Wrap the SMTP client to catch low-level errors
 const originalSMTPClient = SMTPClient;
@@ -12,9 +10,6 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Simple in-memory cache for disposable domain checks
 const disposableCache = new Map();
-
-// Initialize Yahoo OAuth client
-const yahooOAuth = new YahooOAuth();
 
 /**
  * Perform basic syntax check on email address
@@ -67,122 +62,6 @@ async function getMx(domain) {
       timestamp: Date.now()
     });
     return [];
-  }
-}
-
-/**
- * Check if domain is a Yahoo domain requiring OAuth
- * @param {string} domain - Domain to check
- * @returns {boolean} - True if domain is Yahoo
- */
-function isYahooDomain(domain) {
-  const domainLower = domain.toLowerCase();
-  const yahooDomains = [
-    'yahoo.com', 'yahoo.co.uk', 'yahoo.fr', 'yahoo.de', 'yahoo.ca',
-    'yahoo.com.au', 'yahoo.co.in', 'yahoo.co.jp', 'yahoo.es', 'yahoo.it',
-    'ymail.com', 'rocketmail.com'
-  ];
-  
-  return yahooDomains.some(yahooDomain => 
-    domainLower === yahooDomain || domainLower.endsWith('.' + yahooDomain)
-  );
-}
-
-/**
- * Probe SMTP server using OAuth authentication (for Yahoo)
- * @param {string} mxHost - Mail exchange server host
- * @param {string} from - Sender email address
- * @param {string} to - Recipient email address
- * @returns {Promise<Object>} - Result of SMTP probe
- */
-async function smtpProbeOAuth(mxHost, from, to) {
-  let client;
-  
-  try {
-    // Get OAuth token for the email (if available)
-    const accessToken = await yahooOAuth.getValidToken(to);
-    
-    if (!accessToken) {
-      return {
-        ok: false,
-        error: 'OAuth token not available for this email',
-        code: 'NO_OAUTH_TOKEN',
-        requiresAuth: true
-      };
-    }
-    
-    client = new SMTPOAuthClient({
-      host: mxHost,
-      port: 587, // Yahoo uses port 587 for STARTTLS
-      secure: false,
-      timeout: 5000
-    });
-    
-    // Connect to server
-    await client.connect();
-    
-    // Send EHLO and get capabilities
-    const capabilities = await client.ehlo('validator.local');
-    
-    // Upgrade to TLS if supported
-    if (SMTPOAuthClient.supportsStartTLS(capabilities)) {
-      await client.startTLS();
-      // Send EHLO again after STARTTLS
-      const newCapabilities = await client.ehlo('validator.local');
-      capabilities.push(...newCapabilities);
-    }
-    
-    // Generate OAuth authentication string
-    const xoauth2String = yahooOAuth.generateXOAuth2String(to, accessToken, mxHost, 587);
-    
-    // Try XOAUTH2 first, then OAUTHBEARER
-    if (SMTPOAuthClient.supportsXOAuth2(capabilities)) {
-      await client.authXOAuth2(xoauth2String);
-    } else if (SMTPOAuthClient.supportsOAuthBearer(capabilities)) {
-      await client.authOAuthBearer(xoauth2String);
-    } else {
-      throw new Error('Server does not support OAuth authentication');
-    }
-    
-    // Send MAIL FROM
-    await client.mailFrom(from);
-    
-    // Send RCPT TO
-    await client.rcptTo(to);
-    
-    // Quit
-    await client.quit();
-    
-    return { ok: true, response: 'OAuth authentication successful' };
-  } catch (e) {
-    if (client) {
-      client.close();
-    }
-    
-    // Handle OAuth-specific errors
-    if (e.message && e.message.includes('OAuth')) {
-      return {
-        ok: false,
-        error: e.message,
-        code: 'OAUTH_ERROR',
-        requiresAuth: true
-      };
-    }
-    
-    // Handle network errors
-    if (e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED' || e.code === 'ETIMEDOUT') {
-      return {
-        ok: false,
-        error: `Connection error: ${e.message}`,
-        code: e.code
-      };
-    }
-    
-    return {
-      ok: false,
-      error: e.message,
-      code: e.code || 'SMTP_OAUTH_ERROR'
-    };
   }
 }
 
@@ -510,35 +389,6 @@ function isRoleAccount(localPart) {
 }
 
 /**
- * Check if domain requires SMTP skip due to strict anti-spam measures
- * @param {string} domain - Domain to check
- * @returns {boolean} - True if SMTP should be skipped for this domain
- */
-function shouldSkipSMTP(domain) {
-  const domainLower = domain.toLowerCase();
-  
-  // Domains that block or heavily restrict SMTP verification
-  const strictDomains = [
-    'yahoo.com',
-    'yahoo.co.uk',
-    'yahoo.fr',
-    'yahoo.de',
-    'yahoo.ca',
-    'yahoo.com.au',
-    'yahoo.co.in',
-    'yahoo.co.jp',
-    'ymail.com',
-    'rocketmail.com',
-    'aol.com',
-    'aim.com'
-  ];
-  
-  return strictDomains.some(strictDomain => 
-    domainLower === strictDomain || domainLower.endsWith('.' + strictDomain)
-  );
-}
-
-/**
  * Validate an email address through multiple checks with comprehensive error handling
  * @param {string} email - Email to validate
  * @param {Object} opts - Validation options
@@ -588,55 +438,10 @@ async function validateEmail(email, opts = {}) {
       return result; 
     }
     
-    // Check if this is a Yahoo domain that supports OAuth
-    const isYahoo = isYahooDomain(domain);
-    
-    // Check if SMTP should be skipped for this domain (Yahoo, AOL, etc.)
-    const autoSkipSMTP = shouldSkipSMTP(domain);
-    
-    // Try OAuth authentication for Yahoo domains if configured
-    if (isYahoo && yahooOAuth.isConfigured() && !opts.skip_smtp) {
-      try {
-        const oauthProbeResult = await smtpProbeOAuth(mx[0], 'validator@example.com', email);
-        result.smtp = oauthProbeResult;
-        
-        if (oauthProbeResult.ok) {
-          result.status = result.role ? 'risky' : 'valid';
-          result.score = result.role ? 75 : 95;
-          return result;
-        } else if (oauthProbeResult.requiresAuth) {
-          // OAuth token not available, fall back to reputation-based validation
-          const domainReputation = getDomainReputation(domain);
-          result.status = 'valid';
-          result.score = result.role ? 70 : domainReputation;
-          result.smtp = {
-            ok: null,
-            skipped: true,
-            reason: 'OAuth authentication required but token not available, validated via MX and reputation'
-          };
-          return result;
-        }
-        // If OAuth failed for other reasons, fall through to skip logic
-      } catch (oauthError) {
-        console.error('OAuth SMTP probe error:', oauthError);
-      }
-    }
-    
-    // Skip SMTP if requested or auto-detected as strict domain
-    if (opts.skip_smtp || autoSkipSMTP) {
-      if (autoSkipSMTP) {
-        // For strict domains, provide better validation based on MX records
-        result.status = result.role ? 'risky' : 'valid';
-        result.score = result.role ? 70 : 85;
-        result.smtp = {
-          ok: null,
-          skipped: true,
-          reason: 'Domain has strict anti-spam measures, validated via MX records'
-        };
-      } else {
-        result.status = 'risky'; 
-        result.score = 50;
-      }
+    // Skip SMTP if requested
+    if (opts.skip_smtp) {
+      result.status = 'risky'; 
+      result.score = 50; 
       return result;
     }
     
@@ -714,8 +519,5 @@ module.exports = {
   syntaxCheck,
   getMx,
   smtpProbe,
-  smtpProbeOAuth,
-  validateEmail: safeValidateEmail, // Export the safe wrapper
-  yahooOAuth, // Export Yahoo OAuth instance for token management
-  isYahooDomain
+  validateEmail: safeValidateEmail // Export the safe wrapper
 };
